@@ -2,8 +2,8 @@
 
 ```bash
 ################### Repo  ############ Add start #############
-Docker
 Kubernetes
+Docker
 EPEL
 Mesosphere
 
