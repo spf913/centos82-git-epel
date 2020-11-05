@@ -162,4 +162,78 @@ yum install -y --cacheonly --disablerepo=* /root/spf913-depend/kubernetesv1.15.0
 
 
 ##########################  SPF913 CORE DEPLOYED            ##################
+
+
+# post deployment setup
+
+
+systemctl enable irqbalance && \
+systemctl start irqbalance
+
+iptables -P FORWARD ACCEPT && \
+sed -i '/ swap / s/^/#/' /etc/fstab && \
+update-alternatives --set iptables /usr/sbin/iptables-legacy && \
+sed -i '/^pool/c\pool time.google.com iburst' /etc/chrony.conf && \
+timedatectl set-timezone Asia/Colombo && \
+timedatectl set-ntp true && \
+systemctl enable --now chronyd && systemctl status chronyd
+
+ntpstat && \
+chronyc sourcestats -v
+
+cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf > /dev/null
+overlay
+br_netfilter
+EOF
+
+modprobe overlay && \
+modprobe br_netfilter && \
+sysctl --system
+
+
+# file limit optimization
+
+vi /etc/systemd/user.conf
+DefaultLimitNOFILE=100000
+
+vi /etc/pam.d/login
+session required pam_limits.so
+
+vi /etc/systemd/system.conf
+DefaultLimitNOFILE=100000
+
+vi /etc/security/limits.conf
+root soft nofile 100000
+root hard nofile 100000
+
+# sysctl --system
+
+
+
+## Docker post Setup
+mkdir -p /etc/docker && \
+cat > /etc/docker/daemon.json <<EOF
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2",
+  "storage-opts": [
+    "overlay2.override_kernel_check=true"
+  ]
+}
+EOF
+
+mkdir -p /etc/systemd/system/docker.service.d
+
+sudo systemctl enable docker && \
+systemctl start docker && \
+usermod -aG docker ${USER} && \
+su ${USER} && \
+id -nG
+
+REBOOT
+
 ```
